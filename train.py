@@ -15,7 +15,8 @@ from data_utils import TextMelLoader, TextMelCollate
 from loss_function import Tacotron2Loss
 from logger import Tacotron2Logger
 from hparams import create_hparams
-
+import time, sys
+from tqdm import tqdm
 
 def reduce_tensor(tensor, n_gpus):
     rt = tensor.clone()
@@ -205,7 +206,8 @@ def train(output_directory, log_directory, checkpoint_path, warm_start, n_gpus,
     # ================ MAIN TRAINNIG LOOP! ===================
     for epoch in range(epoch_offset, hparams.epochs):
         print("Epoch: {}".format(epoch))
-        for i, batch in enumerate(train_loader):
+        pbar = tqdm(train_loader)
+        for i, batch in enumerate(pbar):
             start = time.perf_counter()
             for param_group in optimizer.param_groups:
                 param_group['lr'] = learning_rate
@@ -234,11 +236,17 @@ def train(output_directory, log_directory, checkpoint_path, warm_start, n_gpus,
                     model.parameters(), hparams.grad_clip_thresh)
 
             optimizer.step()
+            pbar.set_postfix_str(s="Train loss {:.6f} Grad Norm {:.6f}".format(reduced_loss, grad_norm), refresh=True)
 
             if not is_overflow and rank == 0:
                 duration = time.perf_counter() - start
-                print("Train loss {} {:.6f} Grad Norm {:.6f} {:.2f}s/it".format(
-                    iteration, reduced_loss, grad_norm, duration))
+                percent = i/hparams.iters_per_checkpoint
+                barLen = hparams.iters_per_checkpoint
+                #sys.stdout.write("[{:<{}}] {:.0f}%  Train loss {:.6f} Grad Norm {:.6f}".format("=" * int(barLen * percent), 
+                #    barLen, percent * 100, reduced_loss, grad_norm))
+                #print("Train loss {} {:.6f} Grad Norm {:.6f} {:.2f}s/it".format(iteration, reduced_loss, grad_norm, duration))
+                
+                #sys.stdout.flush()        
                 logger.log_training(
                     reduced_loss, grad_norm, learning_rate, duration, iteration)
 
