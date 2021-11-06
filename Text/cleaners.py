@@ -69,6 +69,9 @@ def basic_cleaners(text):
   '''Basic pipeline that lowercases and collapses whitespace without transliteration.'''
   text = lowercase(text)
   text = collapse_whitespace(text)
+  text = '<s>' + text
+  text = text.replace('.' , '</s>')
+  text = text.replace(',' , '<sil>')
   return text
 
 
