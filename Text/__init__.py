@@ -2,9 +2,8 @@
 import re
 from text import cleaners
 from text.symbols import symbols
-
-import os, json
-from collections import defaultdict
+from text.symbols import _specials
+from text.symbols import _silent
 
 # Mappings from symbol to numeric ID and vice versa:
 _symbol_to_id = {s: i for i, s in enumerate(symbols)}
@@ -16,97 +15,43 @@ _curly_re = re.compile(r'(.*?)\{(.+?)\}(.*)')
 
 def text_to_sequence(text, cleaner_names):
   '''Converts a string of text to a sequence of IDs corresponding to the symbols in the text.
-
     The text can optionally have ARPAbet sequences enclosed in curly braces embedded
     in it. For example, "Turn left on {HH AW1 S S T AH0 N} Street."
-
     Args:
       text: string to convert to a sequence
-      cleaner_nmes: names of the cleaner functions to run the text through
-
+      cleaner_names: names of the cleaner functions to run the text through
     Returns:
       List of integers corresponding to the symbols in the text
   '''
   sequence = []
-  
-  phonemes = g2p_sentence_function(text)
-  for phoneme in phonemes:
-      sequence.append(_symbol_to_id[phoneme])
 
-  print(text)
-  print(sequence)
+  #print(text)
+  text = _clean_text(text, cleaner_names)
+  text = text_to_character(text)
+  #print(text)
+  sequence = _symbols_to_sequence(text)
+  #print(sequence)
 
   return sequence
 
-def load_vowels():
-    vowels_dict = defaultdict(list)
-    with open('/storage/vangt/TTS/tacotron2/text/g2p_vowels.json','r') as f:
-        vowels_dict = json.load(f)
-    return vowels_dict
-
-def load_consonants():
-    consonants_dict = defaultdict(list)
-    with open('/storage/vangt/TTS/tacotron2/text/g2p_consonants.json','r') as f:
-        consonants_dict = json.load(f)
-    return consonants_dict
-
-def g2p_word_function(word, vowels, consonants, vowels_dict, consonants_dict):
-
-    p_word = []
-    index = 0
-    
-    for initial in consonants:
-        if word.startswith(initial):
-            index += len(initial)
-            phoneme = consonants_dict[initial]
-            p_word.append(phoneme[0])
-            break
-
-    flat1 = 1
-    while flat1 == 1:
-        flat2 = -1
-        for vowel in vowels:
-            if word.find(vowel, index) == index:
-                flat2 = 1
-                index += len(vowel)
-                phoneme = vowels_dict[vowel]
-                p_word.append(phoneme[0])
-                break
-        if flat2 == -1:
-            flat1 = -1
-    
-    for final in consonants:
-        if word.endswith(final):
-            phoneme = consonants_dict[final]
-            p_word.append(phoneme[0])
-            break
-
-    # pword = '_'.join(p_word)
-    return p_word
-        
-
-def g2p_sentence_function(sentence):
-    vowels_dict = load_vowels()
-    consonants_dict = load_consonants()
-
-    vowels = []
-    consonants = []
-    for key, value in vowels_dict.items():
-        vowels.append(key)
-    for key, value in consonants_dict.items():
-        consonants.append(key)
-
-    text = sentence.split(' ')
-    ptext = []
-    for word in text:
-        if word == "," or word == ".":
-            ptext.append(word)
-        else:
-            # print(g2p_word_function(word, vowels, consonants, vowels_dict, consonants_dict))
-            # ptext.append(g2p_word_function(word, vowels, consonants, vowels_dict, consonants_dict))
-            ptext += g2p_word_function(word, vowels, consonants, vowels_dict, consonants_dict)
-    # ptext = ' '.join(ptext)
-    return ptext
+def text_to_character(text):
+  index = 0
+  sequence = []
+  
+  while index < len(text):
+      if text[index] in symbols:
+          sequence.append(text[index])
+          index += 1
+      elif text.startswith(_silent[0],index,len(text)):
+          sequence.append(_silent[0])
+          index += len(_silent[0])
+      else:
+          for special in _specials:
+              if text.startswith(special, index, len(text)):
+                  sequence.append(special)
+                  index += len(special)
+                  break
+  return sequence
 
 
 def sequence_to_text(sequence):
@@ -140,4 +85,4 @@ def _arpabet_to_sequence(text):
 
 
 def _should_keep_symbol(s):
-  return s in _symbol_to_id and s is not '_' and s is not '~'
+    return s in _symbol_to_id and s is not '_' and s is not '~'
